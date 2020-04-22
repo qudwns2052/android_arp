@@ -5,35 +5,32 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.StringTokenizer;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements ListViewBtnAdapter.ListBtnClickListener{
 
     private Handler mHandler;
     Socket socket;
 
     private Context mContext;
     ListView listView;
-    private ArrayList<String> listInterface;
-//    private String[] listInterface;
-    private ArrayAdapter adapter;
+    TextView textView;
+//    private ArrayList<String> listInterface;
+    private ArrayList<ListViewBtnItem> items;
+    private ListViewBtnAdapter adapter;
+//    private ArrayAdapter adapter;
     private SocketManager mSocketManager;
 
 
@@ -54,16 +51,18 @@ public class MainActivity extends AppCompatActivity {
 
         mHandler = new Handler();
 
-        Button connectButton_ = (Button) findViewById(R.id.button1);
-        Button getListButton_ = (Button) findViewById(R.id.button2);
+        Button connectButton_ = (Button) findViewById(R.id.mbutton1);
+        Button getListButton_ = (Button) findViewById(R.id.mbutton2);
+        Button stopButton_ = (Button) findViewById(R.id.mbutton3);
+        textView = (TextView) findViewById(R.id.mtextView1) ;
 
+        items = new ArrayList<ListViewBtnItem>() ;
+        adapter = new ListViewBtnAdapter(this, R.layout.listview_btn_item, items, (ListViewBtnAdapter.ListBtnClickListener) this);
 
-        listInterface = new ArrayList<>();
-        adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, listInterface) ;
-        listView = (ListView) findViewById(R.id.listView) ;
+        listView = (ListView) findViewById(R.id.mlistView);
         listView.setAdapter(adapter);
 
-
+        //
 //        try {
 //            Process process = Runtime.getRuntime().exec("su -c \"/data/local/tmp/gilgil/pcap_socket\"");
 //        } catch (IOException e1) {
@@ -78,7 +77,6 @@ public class MainActivity extends AppCompatActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
             }
         });
 
@@ -92,8 +90,6 @@ public class MainActivity extends AppCompatActivity {
 
                     Thread.sleep(200);
                     adapter.notifyDataSetChanged();
-
-
                 } catch (Exception e){
                     e.printStackTrace();
                 }
@@ -101,34 +97,72 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        stopButton_.setOnClickListener(new Button.OnClickListener() {
             @Override
-            public void onItemClick(AdapterView<?> adapterView,
-                                    View view, int position, long id) {
+            public void onClick(View v) {
 
-                // 8. 클릭한 아이템의 문자열을 가져와서
-                String selectedItem = (String)adapterView.getItemAtPosition(position);
-                mSocketManager.sendData(selectedItem);
-
-
-
-
-                // 10. 어댑터 객체에 변경 내용을 반영시켜줘야 에러가 발생하지 않습니다.
-                adapter.notifyDataSetChanged();
+                try {
+                    mSocketManager.sendData("2");
+                    Thread.sleep(200);
+                    System.exit(0);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
 
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView parent, View v, int position, long id) {
+                // TODO : item click
+                textView.append("item click\n");
+            }
+        });
+
+//        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+//            @Override
+//            public void onItemClick(AdapterView<?> adapterView,
+//                                    View view, int position, long id) {
+//
+//                String selectedItem = (String)adapterView.getItemAtPosition(position);
+//                mSocketManager.sendData(selectedItem);
+//
+//                adapter.notifyDataSetChanged();
+//            }
+//        });
+
     }
 
-//    class msgUpdate implements Runnable{
-//        private String msg;
-//        public msgUpdate(String str) {
-//            this.msg = str;
-//        }
-//        public void run() {
-//            textView.append(msg);
-//        }
-//    };
+
+    @Override
+    public void onListBtnClick1(int position) {
+        Toast.makeText(this, items.get(position).getText() + " -> Attack start", Toast.LENGTH_SHORT).show() ;
+        items.get(position).switchButton();
+
+        String selectedItem = items.get(position).getText();
+        mSocketManager.sendData(selectedItem);
+
+    }
+
+    @Override
+    public void onListBtnClick2(int position) {
+        Toast.makeText(this, items.get(position).getText() + " -> Attack stop", Toast.LENGTH_SHORT).show() ;
+        items.get(position).switchButton();
+
+        String selectedItem = items.get(position).getText();
+        mSocketManager.sendData(selectedItem);
+
+    }
+
+    class msgUpdate implements Runnable{
+        private String msg;
+        public msgUpdate(String str) {
+            this.msg = str;
+        }
+        public void run() {
+            textView.append(msg);
+        }
+    };
 
 
     public class SocketManager {
@@ -166,9 +200,10 @@ public class MainActivity extends AppCompatActivity {
                     socket = new Socket(ip, port);
                     is = socket.getInputStream();
                     os = socket.getOutputStream();
-//                    mHandler.post(new msgUpdate("connect OK\n"));
-                } catch (Exception e) {
-                    e.printStackTrace();
+
+                    mHandler.post(new msgUpdate("connect ok\n"));
+                } catch (IOException e) {
+                    mHandler.post(new msgUpdate("connect error!!!\n"));
                 }
             }
         };
@@ -189,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
                     os.write(dataBytes);
                     os.flush();
 
-//                    mHandler.post(new msgUpdate("sendData\n"));
+                    mHandler.post(new msgUpdate("send data = " + data + "\n"));
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -206,14 +241,17 @@ public class MainActivity extends AppCompatActivity {
                 try {
 
                     if ((readByteCount = is.read(readBytes)) < 0) {
-//                        mHandler.post(new msgUpdate("read error\n"));
+                        mHandler.post(new msgUpdate("read error\n"));
                     }
                     String buf = new String(readBytes, 0, readByteCount, "UTF-8");
 
                     StringTokenizer s = new StringTokenizer(buf);
 
                     while(s.hasMoreTokens()) {
-                        listInterface.add(s.nextToken(","));
+                        ListViewBtnItem item = new ListViewBtnItem();
+                        item.setText(s.nextToken(","));
+                        items.add(item);
+
                     }
 
                 } catch (Exception e) {
@@ -222,6 +260,5 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-
 
 }
