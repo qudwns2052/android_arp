@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.method.ScrollingMovementMethod;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -33,13 +34,17 @@ public class MainActivity extends AppCompatActivity implements ListViewBtnAdapte
 //    private ArrayAdapter adapter;
     private SocketManager mSocketManager;
 
+    Process process;
 
     @Override
     protected void onStop() {
         super.onStop();
         try {
-            socket.close();
-        } catch (IOException e){
+            mSocketManager.sendData("exit");
+            Thread.sleep(200);
+            mSocketManager = null;
+            System.exit(0);
+        } catch (Exception e){
             e.printStackTrace();
         }
     }
@@ -51,10 +56,9 @@ public class MainActivity extends AppCompatActivity implements ListViewBtnAdapte
 
         mHandler = new Handler();
 
-        Button connectButton_ = (Button) findViewById(R.id.mbutton1);
-        Button getListButton_ = (Button) findViewById(R.id.mbutton2);
-        Button stopButton_ = (Button) findViewById(R.id.mbutton3);
+        Button exitButton_ = (Button) findViewById(R.id.mbutton);
         textView = (TextView) findViewById(R.id.mtextView1) ;
+        textView.setMovementMethod(new ScrollingMovementMethod());
 
         items = new ArrayList<ListViewBtnItem>() ;
         adapter = new ListViewBtnAdapter(this, R.layout.listview_btn_item, items, (ListViewBtnAdapter.ListBtnClickListener) this);
@@ -62,48 +66,33 @@ public class MainActivity extends AppCompatActivity implements ListViewBtnAdapte
         listView = (ListView) findViewById(R.id.mlistView);
         listView.setAdapter(adapter);
 
-        //
-//        try {
-//            Process process = Runtime.getRuntime().exec("su -c \"/data/local/tmp/gilgil/pcap_socket\"");
-//        } catch (IOException e1) {
-//            e1.printStackTrace();
-//        }
 
-        connectButton_.setOnClickListener(new Button.OnClickListener() {
+        try {
+            process = Runtime.getRuntime().exec("su -c \"/data/local/tmp/gilgil/pcap_socket\"");
+            Thread.sleep(200);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        try {
+            mSocketManager = new SocketManager(socket, "127.0.0.1", 25164);
+            Thread.sleep(200);
+            mSocketManager.getList();
+            Thread.sleep(200);
+            adapter.notifyDataSetChanged();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        exitButton_.setOnClickListener(new Button.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
-                    mSocketManager = new SocketManager(socket, "127.0.0.1", 25164);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        getListButton_.setOnClickListener(new Button.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                try {
-                    mSocketManager.sendData("1");
-                    mSocketManager.getList();
-
+                    mSocketManager.sendData("exit");
                     Thread.sleep(200);
-                    adapter.notifyDataSetChanged();
-                } catch (Exception e){
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        stopButton_.setOnClickListener(new Button.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                try {
-                    mSocketManager.sendData("2");
-                    Thread.sleep(200);
+                    mSocketManager = null;
                     System.exit(0);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -136,21 +125,23 @@ public class MainActivity extends AppCompatActivity implements ListViewBtnAdapte
 
     @Override
     public void onListBtnClick1(int position) {
-        Toast.makeText(this, items.get(position).getText() + " -> Attack start", Toast.LENGTH_SHORT).show() ;
-        items.get(position).switchButton();
+        Toast.makeText(this, items.get(position).getText() + " -> ARP Attack start", Toast.LENGTH_SHORT).show() ;
 
+        items.get(position).switchButton();
         String selectedItem = items.get(position).getText();
         mSocketManager.sendData(selectedItem);
+        mHandler.post(new msgUpdate("ARP Attack start -> " + selectedItem + "\n"));
 
     }
 
     @Override
     public void onListBtnClick2(int position) {
-        Toast.makeText(this, items.get(position).getText() + " -> Attack stop", Toast.LENGTH_SHORT).show() ;
-        items.get(position).switchButton();
+        Toast.makeText(this, items.get(position).getText() + " ->ARP Attack stop", Toast.LENGTH_SHORT).show() ;
 
+        items.get(position).switchButton();
         String selectedItem = items.get(position).getText();
         mSocketManager.sendData(selectedItem);
+        mHandler.post(new msgUpdate("ARP Attack stop -> " + selectedItem + "\n"));
 
     }
 
@@ -183,6 +174,15 @@ public class MainActivity extends AppCompatActivity implements ListViewBtnAdapte
             ct = new connectThread();
             ct.start();
         }
+
+        public void finalize() throws Throwable {
+            is.close();
+            os.close();
+            socket.close();
+            super.finalize();
+        }
+
+
 
         public void sendData(String data){
             sendDataThread st = new sendDataThread(data);
@@ -223,8 +223,6 @@ public class MainActivity extends AppCompatActivity implements ListViewBtnAdapte
                     dataBytes = data.getBytes();
                     os.write(dataBytes);
                     os.flush();
-
-                    mHandler.post(new msgUpdate("send data = " + data + "\n"));
 
                 } catch (Exception e) {
                     e.printStackTrace();
